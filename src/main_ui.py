@@ -1,14 +1,14 @@
-import asyncio, os, tempfile
 import flet as ft
 
 from components import (minimize_button, exit_button, theme_button, preset_appbar,
                         preset_input_field, preset_output_container, encrypt_button,
-                        decrypt_button, simple_popup_menu_item)
+                        decrypt_button, simple_popup_menu_item, preset_popup_menu_button)
 from encryption import fernet_generate_key, fernet_decrypt, fernet_encrypt
 from notifications import simple_notification
-from loader import ensure_config_exists, append_to_config_file, CONFIG_FILE, CONFIG_ROOT, _LOG_FILE
+from loader import ensure_config_exists, append_to_config_file
 from typing import Optional
-from pathlib import Path
+from utilities import theme_swap, copy_to_clipboard
+from layouts import default_column, default_container, default_drag_area, default_row
 
 
 async def main_ui(page: ft.Page):
@@ -30,105 +30,64 @@ async def main_ui(page: ft.Page):
             ),
             page=page, duration=5000
         )
+        output_popup_item.disabled = True
     
     # == Helpers ==
-    def text_component(string: Optional[str] = None) -> str:
+    def text_component(value: Optional[str] = None) -> str:
         """
         Lets you edit or get the text component of the `output_container`.
         """
         container: ft.Container = output_container.content
         column: ft.Column = container.content
         text: ft.Text = column.controls[0]
-        if string:
-            text.value = string
+        if value:
+            text.value = value
             text.update()
         return text.value
     
-    # == Event Handlers ==
-    def theme_swap():
-        icon_btn: ft.IconButton = theme_btn.content
-        if page.theme_mode == ft.ThemeMode.DARK:
-            page.theme_mode = ft.ThemeMode.LIGHT
-            icon_btn.icon = ft.Icons.LIGHT_MODE
-        else:
-            page.theme_mode = ft.ThemeMode.DARK
-            icon_btn.icon = ft.Icons.DARK_MODE
-        theme_btn.update()
-    
-    def minimize_window(_):
-        page.window.minimized = True
-        
-    def toggle_text_output(e: ft.ControlEventHandler[ft.PopupMenuItem]):
-        """`e` only has `name="click"` and `data: bool`"""
-        output_popup_item.checked = e.data
-        output_popup_item.update()
-    
-    async def copy_to_clipboard(_):
-        value = text_component()
-        await page.clipboard.set(value)
-        simple_notification("Content copied to clipboard!", page)
-    
-    def encrypt_data(_):
+    def get_field_value() -> str:
         text_field: ft.TextField = input_field.content
         value: str = text_field.value
+        return value
+    
+    # == Event Handlers ==
+    async def copy_key(_):
+        await copy_to_clipboard(key, page)
+    
+    async def output_clicked(_):
+        value = text_component()
+        await copy_to_clipboard(value, page)
+    
+    def encrypt_data(_):
+        value = get_field_value()
         token = fernet_encrypt(value, key)
         text_component(token)
         simple_notification("Data encrypted!", page)
         if ensured_config and output_popup_item.checked:
-            if append_to_config_file(token):
-                print("Successfully written to output.")
+            append_to_config_file(token)
     
     def decrypt_data(_):
-        text_field: ft.TextField = input_field.content
-        value: str = text_field.value
+        value = get_field_value()
         recovered = fernet_decrypt(value, key)
         text_component(recovered)
         simple_notification("Data decrypted!", page)
     
     # == Controls ==
     # App Bar
-    exit_btn = exit_button(
-        lambda _: asyncio.create_task(
-            coro=page.window.close(),
-            name="Exit Button -> Closing Window"
-        )
-    )
-    minimize_btn = minimize_button(minimize_window)
-    theme_btn = theme_button(theme_swap)
-    output_popup_item = ft.PopupMenuItem(
-        content="Output Text File", checked=False, icon=ft.Icons.OUTPUT,
-        on_click=toggle_text_output
-    )
+    exit_btn = exit_button(page)
+    minimize_btn = minimize_button(page)
+    theme_btn = theme_button(lambda _: theme_swap(theme_btn, page))
     output_popup_item = simple_popup_menu_item(
         text="Output Text File", icon=ft.Icons.OUTPUT,
-        on_click=toggle_text_output, color=ft.Colors.PRIMARY,
-        checked=False
+        color=ft.Colors.PRIMARY, checked=False
     )
-    popup_menu_btn = ft.PopupMenuButton(
-        items=[
-            simple_popup_menu_item(
-                text="Open Output", icon=ft.Icons.FILE_OPEN,
-                on_click=lambda _: os.startfile(CONFIG_FILE),
-                color=ft.Colors.PRIMARY
-            ),
-            simple_popup_menu_item(
-                text="Open Output Directory", icon=ft.Icons.FOLDER_OPEN,
-                on_click=lambda _: os.startfile(CONFIG_ROOT),
-                color=ft.Colors.PRIMARY
-            ),
-            output_popup_item,
-            simple_popup_menu_item(
-                text="Open Log File", icon=ft.Icons.FILE_OPEN,
-                on_click=lambda _: os.startfile(_LOG_FILE),
-                color=ft.Colors.SECONDARY
-            ),
-            simple_popup_menu_item(
-                text="Open Log Directory", icon=ft.Icons.FOLDER_OPEN,
-                on_click=lambda _: os.startfile(Path(tempfile.gettempdir())),
-                color=ft.Colors.SECONDARY
-            ),
-        ], icon_color=ft.Colors.PRIMARY
-    )
+    popup_menu_btn = preset_popup_menu_button([
+        output_popup_item,
+        simple_popup_menu_item(
+            text="Copy Key to Clipboard", icon=ft.Icons.COPY,
+            color=ft.Colors.TERTIARY, on_click=copy_key
+        )
+    ])
     appbar = preset_appbar([
         theme_btn, popup_menu_btn,
         ft.Container(padding=8),
@@ -137,33 +96,20 @@ async def main_ui(page: ft.Page):
     
     # Main Form
     input_field = preset_input_field()
-    output_container = preset_output_container(copy_to_clipboard)
+    output_container = preset_output_container(output_clicked)
     
     encrypt_btn = encrypt_button(encrypt_data)
     decrypt_btn = decrypt_button(decrypt_data)
     
-    btn_row = ft.Container(
-        content=ft.Row(
-            controls=[encrypt_btn, decrypt_btn],
-            alignment=ft.MainAxisAlignment.CENTER,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            run_alignment=ft.MainAxisAlignment.CENTER,
-            spacing=8, run_spacing=8
-        ), bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-        padding=16, border_radius=8, alignment=ft.Alignment.CENTER
+    btn_row = default_container(
+        content=default_row([encrypt_btn, decrypt_btn]),
+        bgcolor=ft.Colors.SURFACE_CONTAINER_LOW
     )
     
-    form_column = ft.Container(
-        content=ft.Column(
-            controls=[input_field, output_container, btn_row],
-            alignment=ft.MainAxisAlignment.CENTER,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            run_alignment=ft.MainAxisAlignment.CENTER,
-            expand=True, spacing=8, run_spacing=8
-        ), bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
-        alignment=ft.Alignment.CENTER, padding=16, border_radius=8
+    form_column = default_container(
+        default_column([input_field, output_container, btn_row])
     )
-    form = ft.WindowDragArea(content=form_column, expand=True, maximizable=False)
+    form = default_drag_area(form_column)
     
     # Page Parameters
     page.add(form)

@@ -25,18 +25,21 @@ class LogType(Enum):
     DEFAULT = "default"
     GOOD = "good"
 
-def _log(msg: str, log_type: LogType = LogType.DEFAULT):
+def _log(msg: str, log_type: LogType = LogType.DEFAULT) -> None:
+    """Prints and writes a log."""
     try:
         line = f"[{get_date()}]\t{msg}\n"
         # try to print for dev (console may not exist in packaged app)
         try:
+            def printf(output: str):
+                print(f"[DEBUG] {output}", flush=True)
             match log_type:
                 case LogType.DEFAULT:
-                    print(f"ℹ️ {msg}", flush=True)
+                    printf(f"ℹ️  {msg}")
                 case LogType.WARNING:
-                    print(f"⚠️ {msg}", flush=True)
+                    printf(f"⚠️ {msg}")
                 case LogType.GOOD:
-                    print(f"✅ {msg}", flush=True)
+                    printf(f"✅ {msg}")
         except Exception:
             pass
         # append to log file (always safe)
