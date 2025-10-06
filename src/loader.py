@@ -1,6 +1,10 @@
 import sys, os, tempfile
 from pathlib import Path
+from utilities import get_date
+from enum import Enum
+from utilities import get_date
 
+# Initial Setup
 APP_NAME = "IsaacProj"
 
 # Detect base directory
@@ -12,12 +16,30 @@ else:
 # Log file (always write to a safe location)
 _LOG_FILE = Path(tempfile.gettempdir()) / f"{APP_NAME}_loader.log"
 
-def _log(msg: str):
+# Reset log contents
+with open(_LOG_FILE, "w", encoding="utf-8") as f:
+    f.write(f"[{get_date()}] Logs logs logs...\n=====================================\n")
+
+class LogType(Enum):
+    WARNING = "warning"
+    DEFAULT = "default"
+    GOOD = "good"
+
+def _log(msg: str, log_type: LogType = LogType.DEFAULT) -> None:
+    """Prints and writes a log."""
     try:
-        line = f"{msg}\n"
+        line = f"[{get_date()}]\t{msg}\n"
         # try to print for dev (console may not exist in packaged app)
         try:
-            print(msg, flush=True)
+            def printf(output: str):
+                print(f"[DEBUG] {output}", flush=True)
+            match log_type:
+                case LogType.DEFAULT:
+                    printf(f"ℹ️  {msg}")
+                case LogType.WARNING:
+                    printf(f"⚠️ {msg}")
+                case LogType.GOOD:
+                    printf(f"✅ {msg}")
         except Exception:
             pass
         # append to log file (always safe)
@@ -41,7 +63,7 @@ def can_write_to_dir(path: Path) -> bool:
             pass
         return True
     except Exception as e:
-        _log(f"can_write_to_dir({path}) failed: {e}")
+        _log(f"can_write_to_dir({path}) failed: {e}", LogType.WARNING)
         return False
 
 def _choose_writable_root() -> Path:
@@ -63,17 +85,17 @@ def _choose_writable_root() -> Path:
     for cand in candidates:
         try:
             if can_write_to_dir(cand):
-                _log(f"Selected config root: {cand}")
+                _log(f"Selected config root: {cand}", LogType.GOOD)
                 return cand
         except Exception as e:
-            _log(f"Candidate check failed for {cand}: {e}")
+            _log(f"Candidate check failed for {cand}: {e}", LogType.WARNING)
 
     # as last resort, return the temp path (attempt mkdir, but don't raise)
     final = Path(tempfile.gettempdir()) / APP_NAME / "config"
     try:
         final.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        _log(f"Final mkdir failed for {final}: {e}")
+        _log(f"Final mkdir failed for {final}: {e}", LogType.WARNING)
     return final
 
 # determine CONFIG_ROOT and CONFIG_FILE (globals)
@@ -95,7 +117,7 @@ def ensure_config_exists() -> Path:
     try:
         CONFIG_ROOT.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        _log(f"mkdir failed for {CONFIG_ROOT}: {e}")
+        _log(f"mkdir failed for {CONFIG_ROOT}: {e}", LogType.WARNING)
         # try to pick a safer location (HOME)
         try:
             alt = Path.home() / ".MetaDusk" / APP_NAME / "config"
@@ -104,7 +126,7 @@ def ensure_config_exists() -> Path:
                 CONFIG_ROOT = alt
                 _log(f"Falling back to HOME config root: {CONFIG_ROOT}")
         except Exception as e2:
-            _log(f"Fallback mkdir failed: {e2}")
+            _log(f"Fallback mkdir failed: {e2}", LogType.WARNING)
             # fallback to tempdir
             try:
                 tmp = Path(tempfile.gettempdir()) / APP_NAME / "config"
@@ -112,7 +134,7 @@ def ensure_config_exists() -> Path:
                 CONFIG_ROOT = tmp
                 _log(f"Falling back to TEMP config root: {CONFIG_ROOT}")
             except Exception as e3:
-                _log(f"All mkdir attempts failed: {e3}")
+                _log(f"All mkdir attempts failed: {e3}", LogType.WARNING)
                 # still continue; CONFIG_ROOT may be non-writable but we won't raise
 
     # update CONFIG_FILE to reflect chosen root
@@ -122,11 +144,11 @@ def ensure_config_exists() -> Path:
     try:
         if not CONFIG_FILE.exists():
             CONFIG_FILE.write_text("", encoding="utf-8")
-            _log(f"Created default config at: {CONFIG_FILE}")
+            _log(f"Created default config at: {CONFIG_FILE}", LogType.GOOD)
         else:
-            _log(f"Found existing config at: {CONFIG_FILE}")
+            _log(f"Found existing config at: {CONFIG_FILE}", LogType.GOOD)
     except Exception as e:
-        _log(f"Failed to create or write config at {CONFIG_FILE}: {e}")
+        _log(f"Failed to create or write config at {CONFIG_FILE}: {e}", LogType.WARNING)
         # try to write a fallback config inside HOME or temp (guaranteed writable)
         try:
             fallback = Path.home() / ".MetaDusk" / APP_NAME / OUTPUT_FILE
@@ -134,22 +156,46 @@ def ensure_config_exists() -> Path:
             fallback.write_text("", encoding="utf-8")
             CONFIG_FILE = fallback
             CONFIG_ROOT = fallback.parent
-            _log(f"Wrote fallback config at: {fallback}")
+            _log(f"Wrote fallback config at: {fallback}", LogType.GOOD)
         except Exception as e2:
-            _log(f"Failed to write fallback config at HOME: {e2}")
+            _log(f"Failed to write fallback config at HOME: {e2}", LogType.WARNING)
             try:
                 fallback2 = Path(tempfile.gettempdir()) / APP_NAME / OUTPUT_FILE
                 fallback2.parent.mkdir(parents=True, exist_ok=True)
                 fallback2.write_text("", encoding="utf-8")
                 CONFIG_FILE = fallback2
                 CONFIG_ROOT = fallback2.parent
-                _log(f"Wrote fallback config at TEMP: {fallback2}")
+                _log(f"Wrote fallback config at TEMP: {fallback2}", LogType.GOOD)
             except Exception as e3:
-                _log(f"Failed to write fallback config at TEMP: {e3}")
+                _log(f"Failed to write fallback config at TEMP: {e3}", LogType.WARNING)
                 # give up but don't raise; the app should continue with empty lists
 
-    _log(f"ensure_config_exists() complete. Using CONFIG_ROOT={CONFIG_ROOT}, CONFIG_FILE={CONFIG_FILE}")
+    _log(f"ensure_config_exists() complete. Using CONFIG_ROOT={CONFIG_ROOT}, CONFIG_FILE={CONFIG_FILE}", LogType.GOOD)
     return CONFIG_FILE
+
+
+def append_to_config_file(text: str):
+    """
+    Append a line of text to CONFIG_FILE without overwriting existing contents.
+    Always ensures the file exists first.
+    """
+    try:
+        file_path = ensure_config_exists()
+
+        # Make sure text ends with a newline
+        if not text.endswith("\n"):
+            text += "\n"
+
+        with open(file_path, "a", encoding="utf-8") as f:
+            f.write(f"\n{text},{get_date()}\n")
+
+        _log(f"Appended to config file: {text.strip()}", LogType.GOOD)
+        return True
+
+    except Exception as e:
+        _log(f"append_to_config_file() failed: {e}", LogType.WARNING)
+        return False
+
 
 
 # --- Test function (for dev use only) ---
