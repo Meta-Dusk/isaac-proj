@@ -1,6 +1,6 @@
 [project]
 name = "IsaacProj"
-version = "0.1.0"
+version = "0.2.0"
 description = "Project for Isaac"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -10,6 +10,7 @@ authors = [
 license = { text = "AGPL-3.0" }
 
 dependencies = [
+  "cryptography>=46.0.2",
   "flet==0.70.0.dev6214",
   "flet-cli==0.70.0.dev6214",
   "flet-desktop==0.70.0.dev6214",
