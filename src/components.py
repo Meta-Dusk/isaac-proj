@@ -25,6 +25,19 @@ def important_button(
         icon=icon, on_click=on_click
     )
 
+def simple_popup_menu_item(
+    text: str,
+    color: ft.ColorValue,
+    icon: ft.IconData,
+    on_click: Optional[ft.ControlEventHandler[ft.PopupMenuItem]] = None,
+    checked: Optional[bool] = None
+):
+    return ft.PopupMenuItem(
+        content=ft.Text(value=text, color=color),
+        icon=ft.Icon(icon=icon, color=color),
+        on_click=on_click, checked=checked
+    )
+
 
 # == Pre-Assembled Buttons
 def minimize_button(
@@ -71,15 +84,19 @@ def preset_input_field() -> ft.Container:
             hint_text="Input a paragraph, or anything."
         ),
         bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-        border_radius=8, expand=True, padding=16
+        border_radius=8, padding=16
     )
 
 def preset_output_container(
     on_click: Optional[ft.ControlEventHandler[ft.Container]] = None
 ) -> ft.AnimatedSwitcher:
+    output_column = ft.Column(
+        controls=[ft.Text("Output goes here")], expand=True,
+        scroll=ft.ScrollMode.AUTO
+    )
     return ft.AnimatedSwitcher(
         content=ft.Container(
-            content=ft.Text("Output goes here"),
+            content=output_column,
             expand=True, bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
             alignment=ft.Alignment.CENTER, padding=16,
             border_radius=8, on_click=on_click

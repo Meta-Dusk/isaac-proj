@@ -1,21 +1,51 @@
-import asyncio
+import asyncio, os, tempfile
 import flet as ft
 
 from components import (minimize_button, exit_button, theme_button, preset_appbar,
                         preset_input_field, preset_output_container, encrypt_button,
-                        decrypt_button)
+                        decrypt_button, simple_popup_menu_item)
 from encryption import fernet_generate_key, fernet_decrypt, fernet_encrypt
 from notifications import simple_notification
+from loader import ensure_config_exists, append_to_config_file, CONFIG_FILE, CONFIG_ROOT, _LOG_FILE
+from typing import Optional
+from pathlib import Path
 
 
 async def main_ui(page: ft.Page):
     # == Initial Setup ==
+    ensured_config: bool = False
     await page.window.center()
     key = fernet_generate_key()
-    print(f"Key has been randomized: {key}")
+    # print(f"Key has been randomized: {key}")
+    
+    # Attempt to write to config directory
+    try:
+        ensure_config_exists()
+        ensured_config = True
+    except Exception:
+        simple_notification(
+            content=ft.Text(
+                "Insufficient Write Persmissions! Please start the app as Administrator",
+                color=ft.Colors.ERROR
+            ),
+            page=page, duration=5000
+        )
+    
+    # == Helpers ==
+    def text_component(string: Optional[str] = None) -> str:
+        """
+        Lets you edit or get the text component of the `output_container`.
+        """
+        container: ft.Container = output_container.content
+        column: ft.Column = container.content
+        text: ft.Text = column.controls[0]
+        if string:
+            text.value = string
+            text.update()
+        return text.value
     
     # == Event Handlers ==
-    def theme_swap(_):
+    def theme_swap():
         icon_btn: ft.IconButton = theme_btn.content
         if page.theme_mode == ft.ThemeMode.DARK:
             page.theme_mode = ft.ThemeMode.LIGHT
@@ -34,27 +64,25 @@ async def main_ui(page: ft.Page):
         output_popup_item.update()
     
     async def copy_to_clipboard(_):
-        switcher: ft.AnimatedSwitcher = output_container.content
-        text: ft.Text = switcher.content
-        await page.clipboard.set(text.value)
+        value = text_component()
+        await page.clipboard.set(value)
         simple_notification("Content copied to clipboard!", page)
     
     def encrypt_data(_):
-        input: ft.TextField = input_field.content
-        token = fernet_encrypt(input.value, key)
-        switcher: ft.AnimatedSwitcher = output_container.content
-        text: ft.Text = switcher.content
-        text.value = token
-        text.update()
+        text_field: ft.TextField = input_field.content
+        value: str = text_field.value
+        token = fernet_encrypt(value, key)
+        text_component(token)
         simple_notification("Data encrypted!", page)
+        if ensured_config and output_popup_item.checked:
+            if append_to_config_file(token):
+                print("Successfully written to output.")
     
     def decrypt_data(_):
-        input: ft.TextField = input_field.content
-        recovered = fernet_decrypt(input.value, key)
-        switcher: ft.AnimatedSwitcher = output_container.content
-        text: ft.Text = switcher.content
-        text.value = recovered
-        text.update()
+        text_field: ft.TextField = input_field.content
+        value: str = text_field.value
+        recovered = fernet_decrypt(value, key)
+        text_component(recovered)
         simple_notification("Data decrypted!", page)
     
     # == Controls ==
@@ -71,11 +99,34 @@ async def main_ui(page: ft.Page):
         content="Output Text File", checked=False, icon=ft.Icons.OUTPUT,
         on_click=toggle_text_output
     )
+    output_popup_item = simple_popup_menu_item(
+        text="Output Text File", icon=ft.Icons.OUTPUT,
+        on_click=toggle_text_output, color=ft.Colors.PRIMARY,
+        checked=False
+    )
     popup_menu_btn = ft.PopupMenuButton(
         items=[
-            ft.PopupMenuItem("Open Output", icon=ft.Icons.FILE_OPEN),
-            ft.PopupMenuItem("Open Output Directory", icon=ft.Icons.FOLDER_OPEN),
-            output_popup_item
+            simple_popup_menu_item(
+                text="Open Output", icon=ft.Icons.FILE_OPEN,
+                on_click=lambda _: os.startfile(CONFIG_FILE),
+                color=ft.Colors.PRIMARY
+            ),
+            simple_popup_menu_item(
+                text="Open Output Directory", icon=ft.Icons.FOLDER_OPEN,
+                on_click=lambda _: os.startfile(CONFIG_ROOT),
+                color=ft.Colors.PRIMARY
+            ),
+            output_popup_item,
+            simple_popup_menu_item(
+                text="Open Log File", icon=ft.Icons.FILE_OPEN,
+                on_click=lambda _: os.startfile(_LOG_FILE),
+                color=ft.Colors.SECONDARY
+            ),
+            simple_popup_menu_item(
+                text="Open Log Directory", icon=ft.Icons.FOLDER_OPEN,
+                on_click=lambda _: os.startfile(Path(tempfile.gettempdir())),
+                color=ft.Colors.SECONDARY
+            ),
         ], icon_color=ft.Colors.PRIMARY
     )
     appbar = preset_appbar([
@@ -108,8 +159,7 @@ async def main_ui(page: ft.Page):
             alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             run_alignment=ft.MainAxisAlignment.CENTER,
-            tight=True, spacing=8, run_spacing=8,
-            scroll=ft.ScrollMode.AUTO
+            expand=True, spacing=8, run_spacing=8
         ), bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
         alignment=ft.Alignment.CENTER, padding=16, border_radius=8
     )
