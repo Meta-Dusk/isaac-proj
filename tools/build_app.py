@@ -117,7 +117,7 @@ def main():
         inno_output_dir = ROOT / "dist" / "installer"
         inno_output_dir.mkdir(parents=True, exist_ok=True)
 
-        version_tag = f"{APP_NAME}App-v{version_after}-Win64-Installer"
+        version_tag = f"{APP_NAME}-v{version_after}-Win64-Installer"
         inno_cmd = [
             "iscc",
             f"/O{inno_output_dir}",             # Output folder
