@@ -7,7 +7,7 @@
 #define MyAppVersion "0.0.0"
 #endif
 #define MyAppPublisher "MetaDusk Inc."
-#define MyAppURL "https://github.com/Meta-Dusk/ProductivityApp"
+#define MyAppURL "https://github.com/Meta-Dusk/IsaacProj"
 #define MyAppExeName "isaacproj.exe"
 #define MyAppAssocName MyAppName + " File"
 #define MyAppAssocExt ".prod"

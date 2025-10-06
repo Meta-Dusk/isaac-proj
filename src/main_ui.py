@@ -1,10 +1,18 @@
 import asyncio
 import flet as ft
 
+from components import (minimize_button, exit_button, theme_button, preset_appbar,
+                        preset_input_field, preset_output_container, encrypt_button,
+                        decrypt_button)
+from encryption import fernet_generate_key, fernet_decrypt, fernet_encrypt
+from notifications import simple_notification
+
 
 async def main_ui(page: ft.Page):
     # == Initial Setup ==
     await page.window.center()
+    key = fernet_generate_key()
+    print(f"Key has been randomized: {key}")
     
     # == Event Handlers ==
     def theme_swap(_):
@@ -25,29 +33,40 @@ async def main_ui(page: ft.Page):
         output_popup_item.checked = e.data
         output_popup_item.update()
     
+    async def copy_to_clipboard(_):
+        switcher: ft.AnimatedSwitcher = output_container.content
+        text: ft.Text = switcher.content
+        await page.clipboard.set(text.value)
+        simple_notification("Content copied to clipboard!", page)
+    
+    def encrypt_data(_):
+        input: ft.TextField = input_field.content
+        token = fernet_encrypt(input.value, key)
+        switcher: ft.AnimatedSwitcher = output_container.content
+        text: ft.Text = switcher.content
+        text.value = token
+        text.update()
+        simple_notification("Data encrypted!", page)
+    
+    def decrypt_data(_):
+        input: ft.TextField = input_field.content
+        recovered = fernet_decrypt(input.value, key)
+        switcher: ft.AnimatedSwitcher = output_container.content
+        text: ft.Text = switcher.content
+        text.value = recovered
+        text.update()
+        simple_notification("Data decrypted!", page)
+    
     # == Controls ==
     # App Bar
-    exit_btn = ft.IconButton(
-        icon=ft.Icons.CLOSE, icon_color=ft.Colors.PRIMARY,
-        on_click=lambda _: asyncio.create_task(
+    exit_btn = exit_button(
+        lambda _: asyncio.create_task(
             coro=page.window.close(),
             name="Exit Button -> Closing Window"
         )
     )
-    minimize_btn = ft.IconButton(
-        icon=ft.Icons.MINIMIZE, icon_color=ft.Colors.PRIMARY,
-        on_click=minimize_window
-    )
-    theme_btn = ft.AnimatedSwitcher(
-        content=ft.IconButton(
-            icon=ft.Icons.LIGHT_MODE, icon_color=ft.Colors.PRIMARY,
-            on_click=theme_swap
-        ),
-        transition=ft.AnimatedSwitcherTransition.SCALE,
-        switch_in_curve=ft.AnimationCurve.BOUNCE_OUT,
-        switch_out_curve=ft.AnimationCurve.BOUNCE_IN,
-        duration=500, reverse_duration=200
-    )
+    minimize_btn = minimize_button(minimize_window)
+    theme_btn = theme_button(theme_swap)
     output_popup_item = ft.PopupMenuItem(
         content="Output Text File", checked=False, icon=ft.Icons.OUTPUT,
         on_click=toggle_text_output
@@ -59,51 +78,18 @@ async def main_ui(page: ft.Page):
             output_popup_item
         ], icon_color=ft.Colors.PRIMARY
     )
-    appbar = ft.AppBar(
-        title=ft.WindowDragArea(
-            content=ft.Text("Encryption", color=ft.Colors.PRIMARY),
-            maximizable=False
-        ),
-        actions=[
-            theme_btn, popup_menu_btn,
-            ft.Container(padding=8),
-            minimize_btn, exit_btn
-        ],
-        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
-        actions_padding=4, title_spacing=4,
-        shape=ft.RoundedRectangleBorder(radius=5),
-        leading_width=8, leading=ft.Container()
-    )
+    appbar = preset_appbar([
+        theme_btn, popup_menu_btn,
+        ft.Container(padding=8),
+        minimize_btn, exit_btn
+    ])
     
     # Main Form
-    input_field = ft.Container(
-        content=ft.TextField(
-            autofocus=True, expand=True,
-            hint_text="Input a paragraph, or anything."
-        ),
-        bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-        border_radius=8, expand=True, padding=16
-    )
-    output_container = ft.Container(
-        content=ft.Text("Output goes here"),
-        expand=True, bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
-        alignment=ft.Alignment.CENTER, padding=16,
-        border_radius=8
-    )
-    input_field_column = ft.Column(
-        controls=[input_field, output_container]
-    )
+    input_field = preset_input_field()
+    output_container = preset_output_container(copy_to_clipboard)
     
-    encrypt_btn = ft.Button(
-        "Encrypt", expand=True, color=ft.Colors.PRIMARY,
-        bgcolor=ft.Colors.PRIMARY_CONTAINER,
-        icon=ft.Icons.ENHANCED_ENCRYPTION
-    )
-    decrypt_btn = ft.Button(
-        "Decrypt", expand=True, color=ft.Colors.PRIMARY,
-        bgcolor=ft.Colors.PRIMARY_CONTAINER,
-        icon=ft.Icons.NO_ENCRYPTION
-    )
+    encrypt_btn = encrypt_button(encrypt_data)
+    decrypt_btn = decrypt_button(decrypt_data)
     
     btn_row = ft.Container(
         content=ft.Row(
@@ -118,11 +104,12 @@ async def main_ui(page: ft.Page):
     
     form_column = ft.Container(
         content=ft.Column(
-            controls=[input_field_column, btn_row],
+            controls=[input_field, output_container, btn_row],
             alignment=ft.MainAxisAlignment.CENTER,
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             run_alignment=ft.MainAxisAlignment.CENTER,
-            tight=True, spacing=8, run_spacing=8
+            tight=True, spacing=8, run_spacing=8,
+            scroll=ft.ScrollMode.AUTO
         ), bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
         alignment=ft.Alignment.CENTER, padding=16, border_radius=8
     )
