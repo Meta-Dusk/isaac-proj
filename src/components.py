@@ -2,8 +2,9 @@ import os, tempfile, asyncio
 import flet as ft
 
 from typing import Optional
-from loader import CONFIG_FILE, CONFIG_ROOT, _LOG_FILE
+from loader import CONFIG_FILE, CONFIG_ROOT, _LOG_FILE, reset_config_file
 from pathlib import Path
+from notifications import simple_notification
 
 
 # == Presets ==
@@ -12,6 +13,7 @@ def simple_icon_button(
     icon_color: ft.ColorValue = ft.Colors.PRIMARY,
     on_click: Optional[ft.ControlEventHandler[ft.IconButton]] = None
 ) -> ft.IconButton:
+    """Literally just an icon button."""
     return ft.IconButton(
         icon=icon, icon_color=icon_color, on_click=on_click
     )
@@ -21,6 +23,7 @@ def important_button(
     icon: ft.IconDataOrControl,
     on_click: Optional[ft.ControlEventHandler[ft.Button]] = None
 ) -> ft.Button:
+    """Styling for important buttons."""
     return ft.Button(
         content=content, expand=True,
         color=ft.Colors.PRIMARY,
@@ -35,6 +38,7 @@ def simple_popup_menu_item(
     on_click: Optional[ft.ControlEventHandler[ft.PopupMenuItem]] = None,
     checked: Optional[bool] = None
 ) -> ft.PopupMenuItem:
+    """A popup menu item that handles self-toggling if needed."""
     def default_on_click(e: ft.ControlEventHandler[ft.PopupMenuItem]):
         """`e` only has `name="click"` and `data: bool`"""
         popup_menu_item.checked = e.data
@@ -52,6 +56,7 @@ def simple_popup_menu_item(
 # == Pre-Assembled Components ==
 # Buttons
 def minimize_button(page: ft.Page) -> ft.IconButton:
+    """Handles the window minimizing function."""
     def on_click(_):
         page.window.minimized = True
     return simple_icon_button(
@@ -61,6 +66,7 @@ def minimize_button(page: ft.Page) -> ft.IconButton:
 def theme_button(
     on_click: Optional[ft.ControlEventHandler[ft.IconButton]] = None
 ) -> ft.AnimatedSwitcher:
+    """An animated app theme switcher button."""
     return ft.AnimatedSwitcher(
         content=ft.IconButton(
             icon=ft.Icons.LIGHT_MODE, icon_color=ft.Colors.PRIMARY,
@@ -73,6 +79,7 @@ def theme_button(
     )
 
 def exit_button(page: ft.Page) -> ft.IconButton:
+    """Handles the app exit function."""
     return simple_icon_button(
         icon=ft.Icons.CLOSE,
         on_click=lambda _: asyncio.create_task(
@@ -84,6 +91,7 @@ def exit_button(page: ft.Page) -> ft.IconButton:
 def encrypt_button(
     on_click: Optional[ft.ControlEventHandler[ft.Button]] = None
 ) -> ft.Button:
+    """Use with the encrypt function."""
     return important_button(
         content="Encrypt", icon=ft.Icons.ENHANCED_ENCRYPTION,
         on_click=on_click
@@ -92,12 +100,31 @@ def encrypt_button(
 def decrypt_button(
     on_click: Optional[ft.ControlEventHandler[ft.Button]] = None
 ) -> ft.Button:
+    """Use with the decrypt function."""
     return important_button(
         content="Decrypt", icon=ft.Icons.NO_ENCRYPTION,
         on_click=on_click
     )
 
-def preset_popup_menu_button(new_menu_item: list[ft.PopupMenuItem]) -> ft.PopupMenuButton:
+def preset_popup_menu_button(
+    page: ft.Page, *,
+    new_menu_item: list[ft.PopupMenuItem]
+) -> ft.PopupMenuButton:
+    """An extensive popup menu button, that serves as an extra options menu."""
+    async def on_open(e: ft.ControlEvent):
+        await asyncio.sleep(0.5)
+        popup_menu_btn: ft.PopupMenuButton = e.control
+        popup_menu_btn.badge = None
+        await asyncio.sleep(0.5)
+        popup_menu_btn.update()
+    
+    def reset_config(_):
+        try:
+            reset_config_file()
+            simple_notification("Successfully cleared output file.", page)
+        except Exception as e:
+            simple_notification(f"Failed to clear output file: {e}", page)
+    
     return ft.PopupMenuButton(
         items=[
             simple_popup_menu_item(
@@ -108,6 +135,11 @@ def preset_popup_menu_button(new_menu_item: list[ft.PopupMenuItem]) -> ft.PopupM
             simple_popup_menu_item(
                 text="Open Output Directory", icon=ft.Icons.FOLDER_OPEN,
                 on_click=lambda _: os.startfile(CONFIG_ROOT),
+                color=ft.Colors.PRIMARY
+            ),
+            simple_popup_menu_item(
+                text="Clear Output Contents", icon=ft.Icons.CLEAR_ALL,
+                on_click=reset_config,
                 color=ft.Colors.PRIMARY
             ),
             *new_menu_item,
@@ -121,11 +153,13 @@ def preset_popup_menu_button(new_menu_item: list[ft.PopupMenuItem]) -> ft.PopupM
                 on_click=lambda _: os.startfile(Path(tempfile.gettempdir())),
                 color=ft.Colors.SECONDARY
             ),
-        ], icon_color=ft.Colors.PRIMARY
+        ], icon_color=ft.Colors.PRIMARY, badge=ft.Badge(small_size=10),
+        on_open=on_open
     )
 
 # App Bar
 def preset_appbar(actions: list[ft.Control]) -> ft.AppBar:
+    """A simple predefined appbar."""
     return ft.AppBar(
         title=ft.WindowDragArea(
             content=ft.Text("Encryption", color=ft.Colors.PRIMARY),
@@ -140,6 +174,7 @@ def preset_appbar(actions: list[ft.Control]) -> ft.AppBar:
 
 # Input Fields
 def preset_input_field() -> ft.Container:
+    """A simple wrapped input field."""
     return ft.Container(
         content=ft.TextField(
             autofocus=True, expand=True,
@@ -153,6 +188,7 @@ def preset_input_field() -> ft.Container:
 def preset_output_container(
     on_click: Optional[ft.ControlEventHandler[ft.Container]] = None
 ) -> ft.AnimatedSwitcher:
+    """An animated output container (for post data encryption/decryption)."""
     output_column = ft.Column(
         controls=[ft.Text("Output goes here")], expand=True,
         scroll=ft.ScrollMode.AUTO
@@ -167,5 +203,5 @@ def preset_output_container(
         transition=ft.AnimatedSwitcherTransition.SCALE,
         switch_in_curve=ft.AnimationCurve.BOUNCE_OUT,
         switch_out_curve=ft.AnimationCurve.BOUNCE_IN,
-        duration=500, reverse_duration=200
+        duration=500, reverse_duration=200, expand=True
     )

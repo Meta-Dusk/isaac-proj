@@ -2,7 +2,6 @@ import sys, os, tempfile
 from pathlib import Path
 from utilities import get_date
 from enum import Enum
-from utilities import get_date
 
 # Initial Setup
 APP_NAME = "IsaacProj"
@@ -18,7 +17,7 @@ _LOG_FILE = Path(tempfile.gettempdir()) / f"{APP_NAME}_loader.log"
 
 # Reset log contents
 with open(_LOG_FILE, "w", encoding="utf-8") as f:
-    f.write(f"[{get_date()}] Logs logs logs...\n=====================================\n")
+    f.write(f"[{get_date()}] Logs logs logs...\n{"="*30}\n")
 
 class LogType(Enum):
     WARNING = "warning"
@@ -174,6 +173,11 @@ def ensure_config_exists() -> Path:
     return CONFIG_FILE
 
 
+def reset_config_file():
+    """Resets the contents of the config file."""
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        f.write("")
+
 def append_to_config_file(text: str):
     """
     Append a line of text to CONFIG_FILE without overwriting existing contents.
@@ -182,12 +186,8 @@ def append_to_config_file(text: str):
     try:
         file_path = ensure_config_exists()
 
-        # Make sure text ends with a newline
-        if not text.endswith("\n"):
-            text += "\n"
-
         with open(file_path, "a", encoding="utf-8") as f:
-            f.write(f"\n{text},{get_date()}\n")
+            f.write(f"[EncryptionOutput]\t{text}\t{get_date()}\n")
 
         _log(f"Appended to config file: {text.strip()}", LogType.GOOD)
         return True
