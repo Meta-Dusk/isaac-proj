@@ -11,9 +11,10 @@ license = { text = "AGPL-3.0" }
 
 dependencies = [
   "cryptography>=46.0.2",
-  "flet==0.70.0.dev6214",
-  "flet-cli==0.70.0.dev6214",
-  "flet-desktop==0.70.0.dev6214",
+  "flet==0.70.0.dev6561",
+  "flet-cli==0.70.0.dev6561",
+  "flet-desktop==0.70.0.dev6561",
+  "pycryptodome>=3.23.0",
 ]
 
 [tool.flet]
@@ -24,7 +25,7 @@ copyright = "Copyright (C) 2025 MetaDusk"
 compile_app = true
 compile_packages = true
 cleanup_on_compile = true
-build_number = 1
+build_number = 2
 
 [tool.flet.assets]
 include = [

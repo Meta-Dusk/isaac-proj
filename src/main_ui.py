@@ -2,7 +2,7 @@ import flet as ft
 from components import (minimize_button, exit_button, theme_button, preset_appbar, preset_input_field,
                         preset_output_container, encrypt_button, decrypt_button, simple_popup_menu_item,
                         preset_popup_menu_button)
-from encryption import fernet_generate_key, fernet_decrypt, fernet_encrypt
+from encryption.fernet import fernet_generate_key, fernet_decrypt, fernet_encrypt
 from notifications import simple_notification
 from loader import ensure_config_exists, append_to_config_file
 from typing import Optional

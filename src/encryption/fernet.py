@@ -1,5 +1,6 @@
 from cryptography.fernet import Fernet
 
+
 def fernet_generate_key() -> str:
     """
     Generate a new random key for Fernet.
@@ -7,7 +8,6 @@ def fernet_generate_key() -> str:
     """
     key = Fernet.generate_key()
     return key.decode("utf-8")
-
 
 def fernet_encrypt(plaintext: str, key: str) -> str:
     """
@@ -17,7 +17,6 @@ def fernet_encrypt(plaintext: str, key: str) -> str:
     f = Fernet(key.encode("utf-8"))
     token = f.encrypt(plaintext.encode("utf-8"))
     return token.decode("utf-8")
-
 
 def fernet_decrypt(token: str, key: str) -> str:
     """
